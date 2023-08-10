@@ -1,0 +1,4 @@
+/build/
+/.cache/
+/scripts/*.txt
+.DS_Store
