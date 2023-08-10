@@ -47,7 +47,7 @@ void assert_eq_impl(T expr, R val, const char *name, const char *file,
 
 int main() {
     test_text("ｈｅｌｌｏ", 10, 10);
-    test_text("\0\0\0\x01\x01", 0, 0);
+    test_text("\0\0\0\x01\x01", std::nullopt, std::nullopt);
     test_text("", 0, 0);
     test_text("\u2081\u2082\u2083\u2084", 8, 4);
 
