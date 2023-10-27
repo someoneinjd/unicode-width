@@ -9,14 +9,19 @@ A C++17 header-only library for calculating the display width of characters acco
 ```cpp
 // char_type = char/char16_t/cha32_t/wchar_t/char8_t (C++20)
 
+namespace unicode_width {
+
+using ret_type = std::optional<size_t>;
+
 // calculate the display width of a single character.
-std::optional<size_t> unicode_width::width(char_type ch, bool is_cjk = true);
+ret_type width(char_type ch, bool is_cjk = true);
 
 // calculate the display width of a string.
-std::optional<size_t> unicode_width::width(const std::basic_string<char_type> &str, bool is_cjk = true);
-std::optional<size_t> unicode_width::width(const std::basic_string_view<char_type> str, bool is_cjk = true);
-std::optional<size_t> unicode_width::width(const char_type (&str)[N], bool is_cjk = true);
-std::optional<size_t> unicode_width::width(const char_type *str, size_t len, boo is_cjk = true);
+ret_type width(const std::basic_string<char_type> &str, bool is_cjk = true);
+ret_type width(const std::basic_string_view<char_type> str, bool is_cjk = true);
+ret_type width(const char_type (&str)[N], bool is_cjk = true);
+ret_type width(const char_type *str, size_t len, boo is_cjk = true);
+}
 ```
 
 `width` returns `std::nullopt` if the character is non-printable or the string contains non-printable characters. 
