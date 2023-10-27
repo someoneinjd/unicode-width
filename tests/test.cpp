@@ -87,4 +87,6 @@ int main() {
 
     assert_eq(width(U'\u0300'), 0);
     assert_eq(width(U'\u0300', false), 0);
+
+    assert_eq(width(U'\u1F971'), 2);
 }
