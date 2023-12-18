@@ -341,13 +341,15 @@ def emit_module(out_name: str, tables: list[Table]):
 
         module.write(
             """
+#include <concepts>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <optional>
 #include <string>
 #include <string_view>
 
-namespace unicode_width {
+namespace sc::unicode_width {
 namespace detail {
 """
         )
@@ -365,7 +367,7 @@ constexpr static std::uint8_t TABLE_{i}[] = {{"""
             )
             for j, byte in enumerate(byte_array):
                 # Add line breaks for every 10th entry (chosen to match what clang-format does)
-                if j % 12 == 0:
+                if j % 16 == 0:
                     module.write("\n   ")
                 module.write(f" 0x{byte:02X},")
             module.write("\n};\n")
@@ -428,8 +430,7 @@ std::optional<char32_t> read_utf8(const CharT *&begin) noexcept {
         const std::uint8_t ch3 = *begin++;
         if (ch3 >> 6 != 2) return std::nullopt;
         return (ch0 << 18) + (ch1 << 12) + (ch2 << 6) + ch3 - 0x3C82080;
-    } else if (ch0 <
-               0xFC) {  // 1111_10xx 10xx_xxxx 10xx_xxxx 10xx_xxxx 10xx_xxxx
+    } else if (ch0 < 0xFC) {  // 1111_10xx 10xx_xxxx 10xx_xxxx 10xx_xxxx 10xx_xxxx
         const std::uint8_t ch1 = *begin++;
         if (ch1 >> 6 != 2) return std::nullopt;
         const std::uint8_t ch2 = *begin++;
@@ -438,8 +439,7 @@ std::optional<char32_t> read_utf8(const CharT *&begin) noexcept {
         if (ch3 >> 6 != 2) return std::nullopt;
         const std::uint8_t ch4 = *begin++;
         if (ch4 >> 6 != 2) return std::nullopt;
-        return (ch0 << 24) + (ch1 << 18) + (ch2 << 12) + (ch3 << 6) + ch4 -
-               0xFA082080;
+        return (ch0 << 24) + (ch1 << 18) + (ch2 << 12) + (ch3 << 6) + ch4 - 0xFA082080;
     } else if (ch0 < 0xFE) {  // 1111_110x 10xx_xxxx 10xx_xxxx 10xx_xxxx
                               // 10xx_xxxx 10xx_xxxx
         const std::uint8_t ch1 = *begin++;
@@ -452,8 +452,8 @@ std::optional<char32_t> read_utf8(const CharT *&begin) noexcept {
         if (ch4 >> 6 != 2) return std::nullopt;
         const std::uint8_t ch5 = *begin++;
         if (ch5 >> 6 != 2) return std::nullopt;
-        return (ch0 << 30) + (ch1 << 24) + (ch2 << 18) + (ch3 << 12) +
-               (ch4 << 6) + ch5 - 0x82082080;
+        return (ch0 << 30) + (ch1 << 24) + (ch2 << 18) + (ch3 << 12) + (ch4 << 6) + ch5 -
+               0x82082080;
     } else {
         return std::nullopt;
     }
@@ -475,19 +475,13 @@ std::optional<char32_t> read_utf16(const CharT *&begin) noexcept {
 }
 
 template <typename CharT>
-using return_t = std::enable_if_t<
-    std::is_same_v<CharT, char> || std::is_same_v<CharT, wchar_t> ||
-        std::is_same_v<CharT, char16_t> || std::is_same_v<CharT, char32_t>
-#if __cpp_char8_t >= 201807L
-        || std::is_same_v<CharT, char8_t>
-#endif
-    ,
-    size_t>;
+concept supported_char_type =
+    std::same_as<CharT, char> || std::same_as<CharT, wchar_t> || std::same_as<CharT, char16_t> ||
+    std::same_as<CharT, char32_t> || std::same_as<CharT, char8_t>;
 }  // namespace detail
 
-template <typename CharT>
-std::optional<detail::return_t<CharT>> width(CharT c,
-                                             bool is_cjk = true) noexcept {
+template <detail::supported_char_type CharT>
+std::optional<std::size_t> width(CharT c, bool is_cjk = true) noexcept {
     const size_t cp = static_cast<size_t>(c);
     if (cp < 0x7F) {
         if (cp >= 0x20) {
@@ -504,12 +498,10 @@ std::optional<detail::return_t<CharT>> width(CharT c,
     }
 }
 
-template <typename CharT>
-std::optional<detail::return_t<CharT>> width(const CharT *str, size_t len,
-                                             bool is_cjk = true) noexcept {
-    if constexpr (std::is_same_v<CharT, char32_t> ||
-                  (std::is_same_v<CharT, wchar_t> &&
-                   sizeof(wchar_t) == 4)) {  // UTF-32
+template <detail::supported_char_type CharT>
+std::optional<std::size_t> width(const CharT *str, size_t len, bool is_cjk = true) noexcept {
+    if constexpr (std::same_as<CharT, char32_t> ||
+                  (std::same_as<CharT, wchar_t> && sizeof(wchar_t) == 4)) {  // UTF-32
         size_t ret_val = 0;
         for (size_t i = 0; i < len; i++) {
             auto w = width(str[i], is_cjk);
@@ -517,9 +509,8 @@ std::optional<detail::return_t<CharT>> width(const CharT *str, size_t len,
             ret_val += *w;
         }
         return ret_val;
-    } else if constexpr (std::is_same_v<CharT, char16_t> ||
-                         (std::is_same_v<CharT, wchar_t> &&
-                          sizeof(wchar_t) == 2)) {  // UTF-16LE
+    } else if constexpr (std::same_as<CharT, char16_t> ||
+                         (std::same_as<CharT, wchar_t> && sizeof(wchar_t) == 2)) {  // UTF-16LE
         const auto end = str + len;
         size_t ret_val = 0;
         while (str != end) {
@@ -544,25 +535,23 @@ std::optional<detail::return_t<CharT>> width(const CharT *str, size_t len,
     }
 }
 
-template <typename CharT, size_t N>
-std::optional<detail::return_t<CharT>> width(const CharT (&str)[N],
-                                             bool is_cjk = true) noexcept {
+template <detail::supported_char_type CharT, size_t N>
+std::optional<std::size_t> width(const CharT (&str)[N], bool is_cjk = true) noexcept {
     return width(str, N, is_cjk);
 }
 
-template <typename CharT>
-std::optional<detail::return_t<CharT>> width(
-    const std::basic_string<CharT> &str, bool is_cjk = true) noexcept {
+template <detail::supported_char_type CharT>
+std::optional<std::size_t> width(const std::basic_string<CharT> &str, bool is_cjk = true) noexcept {
     return width(str.data(), str.length(), is_cjk);
 }
 
-template <typename CharT>
-std::optional<detail::return_t<CharT>> width(
-    const std::basic_string_view<CharT> str, bool is_cjk = true) noexcept {
+template <detail::supported_char_type CharT>
+std::optional<std::size_t> width(const std::basic_string_view<CharT> str,
+                                 bool is_cjk = true) noexcept {
     return width(str.data(), str.length(), is_cjk);
 }
 
-}  // namespace unicode_width
+}  // namespace sc::unicode_width
 """
         )
 
